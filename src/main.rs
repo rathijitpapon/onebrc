@@ -14,7 +14,7 @@
     IEEE 754 rounding-direction "roundTowardPositive"
 */
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::str;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -77,7 +77,7 @@ fn process_buffer_bytes(
     buf: &[u8],
     extra_buffer_size: usize,
     total_lines: Arc<Mutex<u32>>,
-) -> BTreeMap<String, WeatherData> {
+) -> HashMap<String, WeatherData> {
     let mut start_index = 0;
     let mut end_index = buf.len() - extra_buffer_size;
 
@@ -98,7 +98,7 @@ fn process_buffer_bytes(
     let line_str = str::from_utf8(&buf[start_index..end_index]).unwrap();
     let lines: Vec<&str> = line_str.split('\n').collect();
 
-    let mut station_temperatures: BTreeMap<String, WeatherData> = BTreeMap::new();
+    let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
     let mut lines_count = 0;
 
     for line in lines {
@@ -133,7 +133,7 @@ fn main() {
     let buffer_size = 2000000;
     let single_row_size = 100;
 
-    let mut station_temperatures: BTreeMap<String, WeatherData> = BTreeMap::new();
+    let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
 
     // Process first line
     let mut file = File::open(file_path).expect("Unable to open file");
@@ -148,7 +148,7 @@ fn main() {
     station_temperatures.insert(first_line_data.0.to_string(), first_line_data.1);
 
     let total_lines = Arc::new(Mutex::new(1));
-    let station_temperatures_list: Arc<Mutex<Vec<BTreeMap<String, WeatherData>>>> =
+    let station_temperatures_list: Arc<Mutex<Vec<HashMap<String, WeatherData>>>> =
         Arc::new(Mutex::new(Vec::new()));
 
     for stage_index in 0..stage_count {
