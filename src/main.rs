@@ -95,7 +95,7 @@ fn process_buffer_bytes(
         }
     }
 
-    let line_str = str::from_utf8(&buf[start_index..end_index]).unwrap();
+    let line_str = unsafe { str::from_utf8_unchecked(&buf[start_index..end_index]) };
     let lines: Vec<&str> = line_str.split('\n').collect();
 
     let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
