@@ -83,16 +83,26 @@ fn process_weather_line(line: &str) -> Result<(&str, WeatherData), &'static str>
 fn process_buffer(buf: &[u8]) -> (HashMap<String, WeatherData>, u32) {
     let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
     let mut station_name = String::new();
-    let mut temperature_str = String::new();
+    let mut temperature = 0.0;
     let mut lines_count = 0;
+    let mut negative_multiplier = 1;
     let mut state = 0;
 
-    for (_, &byte) in buf.iter().enumerate() {
+    for (index, &byte) in buf.iter().enumerate() {
         if byte == b';' {
             state = 1;
+        } else if state == 0 {
+            station_name.push(byte as char);
+        } else if byte == b'.' {
+            temperature = temperature + (u8::from(buf[index + 1]) - 48) as f64 * 0.1;
+            temperature = temperature * negative_multiplier as f64;
+            state = 2;
+        } else if byte == b'-' {
+            negative_multiplier = -1;
+            continue;
+        } else if state == 1 {
+            temperature = temperature * 10.0 + (u8::from(byte) - 48) as f64;
         } else if byte == b'\n' {
-            let temperature = temperature_str.parse::<f64>().unwrap();
-
             if let Some(data) = station_temperatures.get_mut(&station_name) {
                 data.add_temperature(temperature);
             } else {
@@ -108,14 +118,11 @@ fn process_buffer(buf: &[u8]) -> (HashMap<String, WeatherData>, u32) {
                 );
             }
 
-            station_name.clear();
-            temperature_str.clear();
             lines_count += 1;
+            station_name.clear();
+            temperature = 0.0;
+            negative_multiplier = 1;
             state = 0;
-        } else if state == 0 {
-            station_name.push(byte as char);
-        } else if state == 1 {
-            temperature_str.push(byte as char);
         }
     }
 

@@ -44,7 +44,7 @@ let file_path = "weather_stations.csv";
 # Average Execution
 Total lines: 1000000000
 Total stations: 413
-Elapsed time: 7.424793417s
+Elapsed time: 6.631808542s
 
 # Device Info: M3 Pro, 11 Cores CPU, 18GB RAM
 ```
