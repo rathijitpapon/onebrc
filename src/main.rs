@@ -42,6 +42,13 @@ impl WeatherData {
         self.max_temperature = self.max_temperature.max(other.max_temperature);
     }
 
+    fn add_temperature(&mut self, temperature: f64) {
+        self.min_temperature = self.min_temperature.min(temperature);
+        self.max_temperature = self.max_temperature.max(temperature);
+        self.total_temperature += temperature;
+        self.count += 1;
+    }
+
     fn update_mean(&mut self) {
         self.mean_temperature = self.total_temperature / self.count as f64;
     }
@@ -73,7 +80,49 @@ fn process_weather_line(line: &str) -> Result<(&str, WeatherData), &'static str>
     Ok((station_name, weather_data))
 }
 
-fn process_buffer_bytes(
+fn process_buffer(buf: &[u8]) -> (HashMap<String, WeatherData>, u32) {
+    let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
+    let mut station_name = String::new();
+    let mut temperature_str = String::new();
+    let mut lines_count = 0;
+    let mut state = 0;
+
+    for (_, &byte) in buf.iter().enumerate() {
+        if byte == b';' {
+            state = 1;
+        } else if byte == b'\n' {
+            let temperature = temperature_str.parse::<f64>().unwrap();
+
+            if let Some(data) = station_temperatures.get_mut(&station_name) {
+                data.add_temperature(temperature);
+            } else {
+                station_temperatures.insert(
+                    station_name.to_string(),
+                    WeatherData {
+                        total_temperature: temperature,
+                        count: 1,
+                        min_temperature: temperature,
+                        max_temperature: temperature,
+                        mean_temperature: 0.0,
+                    },
+                );
+            }
+
+            station_name.clear();
+            temperature_str.clear();
+            lines_count += 1;
+            state = 0;
+        } else if state == 0 {
+            station_name.push(byte as char);
+        } else if state == 1 {
+            temperature_str.push(byte as char);
+        }
+    }
+
+    return (station_temperatures, lines_count);
+}
+
+fn process_thread(
     buf: &[u8],
     extra_buffer_size: usize,
     total_lines: Arc<Mutex<u32>>,
@@ -90,27 +139,12 @@ fn process_buffer_bytes(
 
     for (index, &byte) in buf[buf.len() - extra_buffer_size..].iter().enumerate() {
         if byte == b'\n' {
-            end_index = index + buf.len() - extra_buffer_size;
+            end_index = index + buf.len() - extra_buffer_size + 1;
             break;
         }
     }
 
-    let line_str = unsafe { str::from_utf8_unchecked(&buf[start_index..end_index]) };
-    let lines: Vec<&str> = line_str.split('\n').collect();
-
-    let mut station_temperatures: HashMap<String, WeatherData> = HashMap::new();
-    let mut lines_count = 0;
-
-    for line in lines {
-        if let Ok((station_name, weather_data)) = process_weather_line(line) {
-            if let Some(data) = station_temperatures.get_mut(station_name) {
-                data.merge(&weather_data);
-            } else {
-                station_temperatures.insert(station_name.to_string(), weather_data);
-            }
-            lines_count += 1;
-        }
-    }
+    let (station_temperatures, lines_count) = process_buffer(&buf[start_index..end_index]);
 
     let mut total_lines = total_lines.lock().unwrap();
     *total_lines += lines_count;
@@ -164,7 +198,7 @@ fn main() {
             let file_reader_thread = thread::spawn(move || {
                 file.seek(SeekFrom::Start(start as u64)).unwrap();
                 file.read(&mut buf).unwrap();
-                let station_temperatures = process_buffer_bytes(&buf, single_row_size, total_lines);
+                let station_temperatures = process_thread(&buf, single_row_size, total_lines);
 
                 let mut station_temperatures_list = station_temperatures_list.lock().unwrap();
                 station_temperatures_list.push(station_temperatures);
