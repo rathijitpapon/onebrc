@@ -18,7 +18,7 @@ This problem is inspired by [1BRC](https://github.com/gunnarmorling/1brc)
 - Implementations must not rely on specifics of a given data set, e.g. any valid station name as per the constraints above and any data distribution (number of measurements per station) must be supported
 - The rounding of output values must be done using the semantics of IEEE 754 rounding-direction "roundTowardPositive"
 
-## Observations [By @ivarflakstad]
+## Observations By [@ivarflakstad](https://github.com/ivarflakstad)
 
 The station names are fairly unique. So we don't need to process the entire name to correctly reference it. The average length is ~14 characters, so rounding up to 16 seems reasonable.
 
