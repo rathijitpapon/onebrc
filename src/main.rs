@@ -25,8 +25,6 @@ use std::{
     fs::File,
     io::{Read, Seek, SeekFrom},
 };
-// use std::collections::HashMap;
-// type AHashMap<K, V> = HashMap<K, V>;
 
 #[derive(Debug, Clone, Copy)]
 struct WeatherData {
@@ -45,6 +43,7 @@ impl WeatherData {
         self.min_temperature = self.min_temperature.min(other.min_temperature);
         self.max_temperature = self.max_temperature.max(other.max_temperature);
     }
+
     #[inline(always)]
     fn add_temperature(&mut self, temperature: f32) {
         self.min_temperature = self.min_temperature.min(temperature);
@@ -52,10 +51,12 @@ impl WeatherData {
         self.total_temperature += temperature;
         self.count += 1;
     }
+
     #[inline(always)]
     fn update_mean(&mut self) {
         self.mean_temperature = self.total_temperature / self.count as f32;
     }
+
     #[inline(always)]
     fn round(&mut self) {
         self.mean_temperature = (self.mean_temperature * 10.0).round() / 10.0;
@@ -73,10 +74,11 @@ fn process_weather_line(line: &str) -> (Key, WeatherData) {
     if parts.len() != 2 || line.is_empty() {
         panic!("Invalid line");
     }
+
     let mut key = [0u8; KEY_SIZE];
     let name = parts[0].as_bytes();
-    let n = name.len().min(KEY_SIZE);
-    key[..n].copy_from_slice(&name[..n]);
+    let station_length = name.len().min(KEY_SIZE);
+    key[..station_length].copy_from_slice(&name[..station_length]);
     let temperature = parts[1].parse::<f32>().unwrap();
 
     let weather_data = WeatherData {
@@ -98,13 +100,14 @@ fn process_buffer(buf: &[u8]) -> (StationTemperatures, u32) {
     let mut lines_count = 0;
     let mut negative_multiplier = 1;
     let mut state = 0;
-    let mut c = 0;
+    let mut station_index = 0;
 
     buf.iter().enumerate().for_each(|(index, &byte)| {
         if byte == b';' {
             state = 1;
-        } else if state == 0 {
-            station_name[c] = byte;
+        } else if state == 0 && station_index < KEY_SIZE {
+            station_name[station_index] = byte;
+            station_index += 1;
         } else if byte == b'.' {
             temperature = temperature + (u8::from(buf[index + 1]) - 48) as f32 * 0.1;
             temperature = temperature * negative_multiplier as f32;
@@ -134,13 +137,7 @@ fn process_buffer(buf: &[u8]) -> (StationTemperatures, u32) {
             temperature = 0.0;
             negative_multiplier = 1;
             state = 0;
-            c = KEY_SIZE;
-        }
-
-        if c + 1 < KEY_SIZE {
-            c += 1;
-        } else {
-            c = 0;
+            station_index = 0;
         }
     });
 
@@ -179,7 +176,6 @@ fn main() {
     // let cores: usize = std::thread::available_parallelism().unwrap().into();
     // println!("{}", cores);
 
-    //let file_path = "weather_stations.csv";
     let file_path = "measurements.txt";
 
     let mut station_temperatures: StationTemperatures = AHashMap::with_capacity(500);
